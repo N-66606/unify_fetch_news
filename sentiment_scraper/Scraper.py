@@ -1,12 +1,10 @@
 """
-财联社 & 东方财富 舆情爬虫 v7
+财联社 舆情爬虫 v7
 
 数据来源：
   1. 财联社搜索 /api/sw        → exports/财联社/公司名_天数.csv
   2. 财联社电报流 /api/cache   → 同上合并
-  3. 东方财富搜索              → exports/东方财富/公司名_天数.csv
-     - 按标题去重
-     - 自动爬取原文全文
+
 
 变更：删除新浪7x24（命中率低）
 """
@@ -294,127 +292,6 @@ class CLS:
             print("❌ 搜索接口失败")
 
 
-# ════════════════════════════════════════════════════════════
-# 东方财富
-# ════════════════════════════════════════════════════════════
-class EastMoney:
-    EM_URL = "https://search-api-web.eastmoney.com/search/jsonp"
-
-    def __init__(self):
-        self.sess = make_session("https://so.eastmoney.com/")
-
-    def fetch_news(self, keyword, page=1, size=20):
-        param = {
-            "uid": "", "keyword": keyword,
-            "type": ["cmsArticleWebOld"],
-            "client": "web", "clientType": "web", "clientVersion": "curr",
-            "param": {"cmsArticleWebOld": {
-                "searchScope": "default", "sort": "default",
-                "pageIndex": page, "pageSize": size,
-                "preTag": "", "postTag": "",
-            }}
-        }
-        params = {
-            "cb": "eastmoney_cb",
-            "param": json.dumps(param, ensure_ascii=False),
-            "_": str(int(time.time() * 1000)),
-        }
-        try:
-            resp = self.sess.get(
-                self.EM_URL, params=params, timeout=15,
-                headers={"Referer": f"https://so.eastmoney.com/news/s?keyword={quote(keyword)}"})
-            resp.raise_for_status()
-            text = re.sub(r"^[^(]+\(", "", resp.text).rstrip(");")
-            return json.loads(text).get("result", {}).get("cmsArticleWebOld", [])
-        except Exception as e:
-            log.error(f"[东方财富] {e}")
-            return []
-
-    def fetch_fulltext(self, url: str) -> str:
-        """爬取东方财富文章原文"""
-        try:
-            resp = self.sess.get(url, timeout=15,
-                                 headers={"Accept": "text/html,application/xhtml+xml,*/*"})
-            resp.encoding = resp.apparent_encoding
-            # 提取正文：东方财富文章正文在 <div class="newsContent"> 或 <div id="ContentBody">
-            for pattern in [
-                r'<div[^>]+class="[^"]*newsContent[^"]*"[^>]*>(.*?)</div>',
-                r'<div[^>]+id="ContentBody"[^>]*>(.*?)</div>',
-                r'<div[^>]+class="[^"]*article[^"]*"[^>]*>(.*?)</div>',
-            ]:
-                m = re.search(pattern, resp.text, re.DOTALL)
-                if m:
-                    return clean(m.group(1))
-            # fallback：取所有 <p> 标签内容
-            paras = re.findall(r"<p[^>]*>(.*?)</p>", resp.text, re.DOTALL)
-            text  = " ".join(clean(p) for p in paras if len(clean(p)) > 20)
-            return text[:3000] if text else ""
-        except Exception as e:
-            log.warning(f"[东方财富全文] 爬取失败 {url}: {e}")
-            return ""
-
-    def scrape(self, company, pages=10, fetch_full=True):
-        keyword = company["keywords"][0]
-        raw_records = []
-
-        for p in range(1, pages + 1):
-            log.info(f"[东方财富] {company['name']} 第{p}页")
-            items = self.fetch_news(keyword, page=p, size=20)
-            if not items:
-                break
-            for item in items:
-                iid     = item.get("code", "")
-                title   = clean(item.get("title", ""))
-                content = clean(item.get("content", ""))   # 摘要，可能不全
-                url     = item.get("url", "")
-                raw_records.append({
-                    "id":       f"eastmoney_{iid}",
-                    "source":   f"东方财富-{item.get('mediaName', '')}",
-                    "company":  company["name"],
-                    "title":    title,
-                    "content":  content,
-                    "pub_time": item.get("date", ""),
-                    "url":      url,
-                    "raw_json": json.dumps(item, ensure_ascii=False),
-                    "_url":     url,   # 临时字段，用于爬全文
-                })
-            log.info(f"  获取{len(items)}条")
-            time.sleep(REQUEST_INTERVAL)
-
-        # 按标题去重（相同标题只保留第一条）
-        before = len(raw_records)
-        raw_records = dedup_by_title(raw_records)
-        log.info(f"[东方财富] 标题去重：{before} -> {len(raw_records)} 条")
-
-        # 爬取全文（替换摘要）
-        if fetch_full:
-            for i, rec in enumerate(raw_records):
-                url = rec.pop("_url", "")
-                if url:
-                    log.info(f"[东方财富全文] {i+1}/{len(raw_records)} {url[:60]}")
-                    full = self.fetch_fulltext(url)
-                    if full and len(full) > len(rec["content"]):
-                        rec["content"] = full
-                    time.sleep(1)   # 爬全文稍慢一点，礼貌抓取
-                else:
-                    rec.pop("_url", None)
-        else:
-            for rec in raw_records:
-                rec.pop("_url", None)
-
-        return raw_records
-
-    def diagnose(self):
-        print("\n--- 东方财富诊断 ---")
-        items = self.fetch_news("立讯精密", page=1, size=3)
-        if items:
-            print(f"✅ 接口正常，立讯精密第1条：")
-            print(f"   title={clean(items[0].get('title',''))[:60]}")
-            print(f"   date={items[0].get('date','')}  media={items[0].get('mediaName','')}")
-            print(f"   content(摘要)={clean(items[0].get('content',''))[:80]}")
-        else:
-            print("❌ 接口失败")
-
 
 # ════════════════════════════════════════════════════════════
 # 调度器
@@ -423,7 +300,6 @@ class Scheduler:
     def __init__(self, db=DB_PATH):
         self.conn  = init_db(db)
         self.cls   = CLS()
-        self.em    = EastMoney()
 
     def run_once(self, companies=None):
         total = 0
@@ -435,12 +311,8 @@ class Scheduler:
             save_news(self.conn, cls_rows)
             log.info(f"[财联社] {co['name']} 入库 {len(cls_rows)} 条")
 
-            # 东方财富（标题去重+爬全文）
-            em_rows = self.em.scrape(co, pages=10, fetch_full=True)
-            save_news(self.conn, em_rows)
-            log.info(f"[东方财富] {co['name']} 入库 {len(em_rows)} 条")
-
-            total += len(cls_rows) + len(em_rows)
+            
+            total += len(cls_rows)
             time.sleep(REQUEST_INTERVAL)
 
         log.info(f"本轮完成，共 {total} 条")
@@ -473,7 +345,7 @@ class Scheduler:
         """分别导出财联社和东方财富到不同子目录"""
         for src, sf, subdir in [
             ("财联社", "cls", "财联社"),
-            ("东方财富", "em",  "东方财富"),
+            # ("东方财富", "em",  "东方财富"),
         ]:
             news = self.query(company, days=days, source_filter=sf)
             if not news:
@@ -490,7 +362,7 @@ class Scheduler:
 
     def diagnose(self):
         self.cls.diagnose()
-        self.em.diagnose()
+        # self.em.diagnose()
 
 
 # ════════════════════════════════════════════════════════════

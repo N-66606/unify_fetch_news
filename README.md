@@ -10,7 +10,7 @@
 
 ```
 sort_news_data/
-├── main.py                        # 统一入口：指定数据源一键完成爬取+转换
+├── main.py                        # 统一入口：指定数据源一键完成爬取 + 转换
 ├── config.py                      # 共享配置：公司表、股票代码、API 配置
 │
 ├── relation_news/                 # 大类一：法定披露关系 & 财经新闻
@@ -19,40 +19,41 @@ sort_news_data/
 │   ├── jrj_crawler.py             # 金融界新闻爬虫
 │   ├── news_to_json.py            # 统一转换：所有来源 CSV → 舆情 JSON
 │   ├── extract_util.py            # 公告对手方实体抽取工具（cninfo 使用）
-│   ├── diagnose_cninfo.py         # 巨潮接口连通性诊断脚本
-│   └── intermediate/              # 中间产物（运行时自动创建）
-│       ├── csv/                   # 各爬虫输出的原始 CSV
-│       ├── cache/                 # LLM 调用结果缓存（按 URL/ID 缓存，重跑不重复计费）
-│       ├── text/                  # 公告 PDF 提取的全文 txt（cninfo）
-│       └── pdf/                   # 公告 PDF 原件（cninfo，SAVE_PDF=True 时）
-│   └── output/                    # 最终 JSON（运行时自动创建）
-│       ├── cninfo_json/           # 舆情_cninfo_{公司名}.json
-│       ├── cnstock_json/          # 舆情_cnstock_{公司名}.json
-│       └── jrj_json/              # 舆情_jrj_{公司名}.json
+│   └── diagnose_cninfo.py         # 巨潮接口连通性诊断脚本
 │
-└── sentiment_scraper/             # 大类二：通用舆情（财联社 & 东方财富）
-    ├── Scraper.py                 # 财联社 + 东方财富双源爬虫（含定时任务）
-    ├── eastmoney_only.py          # 东方财富独立爬虫
-    ├── Visualizer.py              # 数据可视化工具
-    └── exports/                   # 爬虫导出的 CSV（运行时自动创建）
-        ├── 东方财富/              # {公司名}_N天.csv
-        └── 财联社/                # {公司名}_N天.csv
-    └── output/                    # 最终 JSON（运行时自动创建）
-        ├── eastmoney_json/        # 舆情_eastmoney_{公司名}.json
-        └── cls_json/              # 舆情_cls_{公司名}.json
+├── sentiment_scraper/             # 大类二：通用舆情（财联社 & 东方财富）
+│   ├── cls_crawler.py             # 财联社独立爬虫（搜索 + 电报流合并）
+│   ├── eastmoney_only.py          # 东方财富独立爬虫
+│   ├── Scraper.py                 # 原始双源爬虫（财联社部分保留，供参考/定时任务）
+│   ├── Visualizer.py              # 数据可视化工具
+│   └── exports/                   # 爬虫导出的 CSV（运行时自动创建）
+│       ├── 东方财富/              # {公司名}_东方财富.csv
+│       └── 财联社/                # {公司名}_财联社.csv
+│
+├── intermediate/                  # 中间产物（运行时自动创建）
+│   ├── csv/                       # relation_news 各爬虫输出的原始 CSV
+│   ├── cache/                     # LLM 调用结果缓存（重跑不重复计费）
+│   └── text/                      # 公告 PDF 提取的全文 txt（cninfo）
+│
+└── output/                        # 最终 JSON（运行时自动创建）
+    ├── cninfo_json/               # 舆情_cninfo_{公司名}.json
+    ├── cnstock_json/              # 舆情_cnstock_{公司名}.json
+    ├── jrj_json/                  # 舆情_jrj_{公司名}.json
+    ├── eastmoney_json/            # 舆情_eastmoney_{公司名}.json
+    └── cls_json/                  # 舆情_cls_{公司名}.json
 ```
 
 ---
 
 ## 数据来源与覆盖
 
-| 数据源 | `--source` | 内容类型 | 关键词过滤 | 正文获取 |
-|---|---|---|---|---|
-| 巨潮资讯网 | `cninfo` | 上市公司公告（强制披露） | 股权/并购/担保/关联交易/诉讼 | PDF 全文提取 |
-| 中国证券网 | `cnstock` | 财经新闻 | 合作/供应链/竞争/投资/监管 | HTML 正文解析 |
-| 金融界 | `jrj` | 财经新闻 | 同上 | meta description |
-| 东方财富 | `eastmoney` | 财经新闻 | 公司名关键词 | 原文全文 |
-| 财联社 | `cls` | 财经电报 + 新闻 | 公司名关键词 | 电报正文 |
+| 数据源 | `--source` | 内容类型 | 正文获取 |
+|---|---|---|---|
+| 巨潮资讯网 | `cninfo` | 上市公司公告（强制披露） | PDF 全文提取 |
+| 中国证券网 | `cnstock` | 财经新闻 | HTML 正文解析 |
+| 金融界 | `jrj` | 财经新闻 | meta description |
+| 东方财富 | `eastmoney` | 财经新闻 | 原文全文 |
+| 财联社 | `cls` | 财经电报 + 新闻 | 电报正文 |
 
 **覆盖公司（10 家）：** 立讯精密、佰维存储、中芯国际、中信证券、工业富联、郑州煤电、兆易创新、京能电力、蔚蓝锂芯、恒瑞医药
 
@@ -63,7 +64,7 @@ sort_news_data/
 ### 环境准备
 
 ```bash
-pip install requests beautifulsoup4 lxml pdfplumber
+pip install requests beautifulsoup4 lxml pdfplumber urllib3
 # cninfo PDF 解析备用库（pdfplumber 失败时自动切换）
 pip install pymupdf
 ```
@@ -73,13 +74,15 @@ pip install pymupdf
 ```bash
 # Windows
 set DASHSCOPE_API_KEY=sk-xxxx
-# Linux/Mac
+# Linux / Mac
 export DASHSCOPE_API_KEY=sk-xxxx
 ```
 
-> Key 也可以直接填入 `config.py` 的 `API_KEY` 变量（不推荐提交到代码仓库）。
+> Key 也可以直接写入 `config.py` 的 `API_KEY` 变量（不推荐提交到代码仓库）。
 
 ### 基本用法
+
+所有数据源均通过根目录的 `main.py` 统一调用，**财联社已与其他来源完全一致，无需手动操作**。
 
 ```bash
 # 从项目根目录运行
@@ -91,6 +94,12 @@ python main.py --source cnstock
 # 指定公司 + 时间段
 python main.py --source cnstock --company 立讯精密 中信证券 --date-start 2026-01-01
 
+# 财联社（与其他来源用法完全一致）
+python main.py --source cls --company 立讯精密 --date-start 2026-03-01
+
+# 东方财富
+python main.py --source eastmoney --company 中芯国际 --date-start 2026-01-01 --date-end 2026-06-01
+
 # 只转换已有 CSV（跳过爬取，适合重新调整 prompt 后重跑）
 python main.py --source jrj --skip-crawl
 
@@ -98,29 +107,36 @@ python main.py --source jrj --skip-crawl
 python main.py --source cninfo --skip-convert --date-start 2026-03-01
 ```
 
-### 财联社特殊说明
+### 财联社登录配置
 
-财联社爬虫（`Scraper.py`）需要单独运行，需要先配置登录信息：
+财联社接口需要登录态，首次使用前在 `sentiment_scraper/cls_crawler.py` 顶部填入凭据：
 
-```bash
-# 1. 打开 sentiment_scraper/Scraper.py，填入顶部配置区
-CLS_TOKEN  = "..."
-CLS_UID    = "..."
-CLS_COOKIE = "..."   # 从浏览器 F12 → Network 复制
+```python
+CLS_TOKEN  = "你的token"
+CLS_UID    = "你的uid"
+CLS_COOKIE = "从浏览器 F12 → Network 复制的完整 Cookie"
+```
 
-# 2. 诊断接口
-cd sentiment_scraper
-python Scraper.py --mode diagnose
+获取方式：浏览器登录 [cls.cn](https://www.cls.cn)，打开 F12 → Network，随意点击页面触发一个请求，从请求头中复制 `Cookie` 字段，并从 Cookie 或用户信息接口中取出 `token` 和 `uid`。**Cookie 有效期约 2 个月**，过期后重新复制即可。
 
-# 3. 爬取
-python Scraper.py --mode once
+---
 
-# 4. 导出 CSV
-python Scraper.py --mode query --company 立讯精密 --days 180
+## 数据流
 
-# 5. 回到根目录做转换
-cd ..
-python main.py --source cls --skip-crawl
+```
+        爬虫（各 crawler）
+              │
+              ▼
+    sentiment_scraper/exports/  或  intermediate/csv/
+           （原始 CSV）
+              │
+              ▼
+    relation_news/news_to_json.py
+        （LLM 结构化抽取，带缓存）
+              │
+              ▼
+          output/{source}_json/
+        舆情_{source}_{公司名}.json
 ```
 
 ---
@@ -153,7 +169,7 @@ python main.py --source cls --skip-crawl
 }
 ```
 
-### event_type 枚举
+### event_type 枚举（14 类）
 
 | 类型 | 适用场景 |
 |---|---|
@@ -180,36 +196,37 @@ python main.py --source cls --skip-crawl
 
 | 参数 | 说明 | 默认值 |
 |---|---|---|
-| `--source` | 数据源，必填 | — |
-| `--company` | 公司名，可多个，空格分隔 | 全部 10 家 |
-| `--date-start` | 起始日期 YYYY-MM-DD | 最近 180 天 |
-| `--date-end` | 截止日期 YYYY-MM-DD | 今天 |
+| `--source` | 数据源，必填，可选：`cninfo` `cnstock` `jrj` `eastmoney` `cls` | — |
+| `--company` | 公司简称，可多个，空格分隔 | 全部 10 家 |
+| `--date-start` | 起始日期 `YYYY-MM-DD` | 最近 180 天 |
+| `--date-end` | 截止日期 `YYYY-MM-DD` | 今天 |
 | `--skip-crawl` | 跳过爬取，只做转换 | False |
 | `--skip-convert` | 只爬取，不做转换 | False |
 
-### 各爬虫（单独运行时）
+### 各爬虫（单独运行）
 
-cninfo / cnstock / jrj / eastmoney 均支持相同的 CLI 参数：
-`--company`、`--date-start`、`--date-end`
-
-### news_to_json.py（单独运行时）
+`cninfo / cnstock / jrj / eastmoney / cls` 均支持相同的 CLI 参数：`--company`、`--date-start`、`--date-end`。
 
 ```bash
-python relation_news/news_to_json.py --source cnstock --company 立讯精密 --date-start 2026-01-01
+# 单独运行财联社爬虫（只产出 CSV，不做 LLM 转换）
+python sentiment_scraper/cls_crawler.py --company 立讯精密 --date-start 2026-03-01
+
+# 单独运行转换
+python relation_news/news_to_json.py --source cls --company 立讯精密 --date-start 2026-03-01
 ```
 
 ---
 
 ## 扩展：新增公司
 
-在 `config.py` 中添加：
+**Step 1**：在 `config.py` 中添加公司信息：
 
 ```python
 COMPANY_FULLNAME["比亚迪"] = "比亚迪股份有限公司"
 COMPANY_CODE["比亚迪"]     = "002594.SZ"
 ```
 
-同时在 `sentiment_scraper/Scraper.py` 的 `COMPANIES` 列表添加：
+**Step 2**：`eastmoney_only.py` 和 `cls_crawler.py` 直接使用 `config.py` 中的公司列表，无需额外修改。如果仍在使用 `Scraper.py` 的定时任务模式，则同时在其 `COMPANIES` 列表中添加：
 
 ```python
 {"name": "比亚迪", "stock_code": "sz002594", "keywords": ["比亚迪", "002594"]},
@@ -219,29 +236,33 @@ COMPANY_CODE["比亚迪"]     = "002594.SZ"
 
 ## 缓存机制
 
-`news_to_json.py` 对每条记录按 URL MD5（新闻）或 `announcementId`（公告）做缓存，存储在 `relation_news/intermediate/cache/` 目录。重新运行时已处理的条目直接读缓存，不重复调用 API。
+`news_to_json.py` 对每条记录按 URL MD5（新闻）或 `announcementId`（公告）做缓存，存储在 `intermediate/cache/` 目录。重新运行时已处理的条目直接读缓存，不重复调用 API。
 
-如需强制重跑（如修改了 prompt），删除对应的 `cache/` 文件即可：
+如需强制重跑（如修改了 prompt），删除对应的缓存文件即可：
+
 ```bash
-# 删除 cnstock 的立讯精密缓存
-rm relation_news/intermediate/cache/cnstock_cache_立讯精密.jsonl
+# 删除财联社的立讯精密缓存
+rm intermediate/cache/cls_cache_立讯精密.jsonl
+
+# 删除 cnstock 的中信证券缓存
+rm intermediate/cache/cnstock_cache_中信证券.jsonl
 ```
 
 ---
 
 ## 常见问题
 
+**Q：财联社 Cookie 过期，爬取失败**
+重新从浏览器复制 `CLS_TOKEN`、`CLS_UID`、`CLS_COOKIE` 并填入 `sentiment_scraper/cls_crawler.py` 顶部，有效期约 2 个月。
+
 **Q：cninfo 爬取结果为 0 条**
 先运行诊断脚本确认接口连通：`python relation_news/diagnose_cninfo.py`
 
-**Q：财联社 ❌ 失败**
-Cookie 已过期（有效期约 2 个月），重新从浏览器复制 `CLS_TOKEN`、`CLS_UID`、`CLS_COOKIE`。
-
 **Q：LLM 返回格式错误**
-`news_to_json.py` 内置容错解析，若仍失败会跳过该条并记录日志，不影响其他条目。失败条目不会写入缓存，下次运行会重试。
+`news_to_json.py` 内置容错解析，若仍失败会跳过该条并记录日志，不影响其他条目。失败条目不会写入缓存，下次运行会自动重试。
 
 **Q：金融界正文内容很短**
 金融界页面为客户端渲染（CSR），正文来自 `<meta name="description">`，是截断的摘要片段，属正常现象，不影响结构化抽取。
 
-**Q：修改公司列表后 event_id 出现重复**
-`event_id` 由 `{股票代码}_{日期}_{当日序号}` 组成，序号在单次运行内按日期独立计数，不同来源的输出分别存储，不会跨文件冲突。
+**Q：`event_id` 重复**
+`event_id` 由 `{股票代码}_{日期}_{当日序号}` 组成，序号在单次运行内按日期独立计数。不同来源的输出分别存储到不同子目录，不会跨文件冲突。

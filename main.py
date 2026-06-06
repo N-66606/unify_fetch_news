@@ -34,7 +34,7 @@ CRAWLER_SCRIPTS = {
     "cnstock":   os.path.join("relation_news", "cnstock_crawler.py"),
     "jrj":       os.path.join("relation_news", "jrj_crawler.py"),
     "eastmoney": os.path.join("sentiment_scraper", "eastmoney_only.py"),
-    "cls":       None,  # 财联社集成在 Scraper.py，需手动运行
+    "cls":       os.path.join("sentiment_scraper", "cls_crawler.py"),
 }
 
 NEWS_TO_JSON = os.path.join("relation_news", "news_to_json.py")
@@ -51,14 +51,14 @@ def run_script(script_path, extra_args=None):
 def run_crawler(source, companies, date_start, date_end):
     script = CRAWLER_SCRIPTS.get(source)
 
-    if script is None:  # cls
-        log.warning(
-            "[cls] 财联社爬虫请手动运行：\n"
-            "  cd sentiment_scraper && python Scraper.py --mode once\n"
-            "运行完成后按 Enter 继续，程序将执行转换步骤。"
-        )
-        input("手动爬取完成后按 Enter 继续...")
-        return
+    # if script is None:  # cls
+    #     log.warning(
+    #         "[cls] 财联社爬虫请手动运行：\n"
+    #         "  cd sentiment_scraper && python Scraper.py --mode once\n"
+    #         "运行完成后按 Enter 继续，程序将执行转换步骤。"
+    #     )
+    #     input("手动爬取完成后按 Enter 继续...")
+    #     return
 
     if not os.path.exists(script):
         raise FileNotFoundError(f"爬虫脚本不存在：{script}")
