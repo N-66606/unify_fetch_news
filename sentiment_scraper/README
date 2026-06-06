@@ -1,0 +1,217 @@
+# 上市公司舆情爬虫
+
+财联社 + 东方财富双源舆情数据采集工具，支持十家指定上市公司的新闻自动抓取、去重入库和 CSV 导出。
+
+---
+
+## 项目文件
+
+```
+sentiment_scraper/
+├── scraper.py           # 主程序（财联社 + 东方财富，十家公司）
+├── eastmoney_only.py    # 东方财富独立爬虫（单独测试用）
+├── sentiment_news.db    # SQLite 数据库（运行后自动生成）
+├── scraper.log          # 运行日志（运行后自动生成）
+├── exports/             # CSV 导出目录（运行后自动生成）
+│   ├── 财联社/
+│   │   └── 公司名_N天.csv
+│   └── 东方财富/
+│       └── 公司名_N天.csv
+└── README.md
+```
+
+---
+
+## 环境要求
+
+- Python 3.9+
+- 依赖库：
+
+```bash
+pip install requests
+```
+
+---
+
+## 快速开始
+
+### 第一步：配置财联社登录信息
+
+财联社接口需要登录态，首次使用需要填入个人账号信息。
+
+打开 `scraper.py`，找到顶部配置区，填入以下三个变量：
+
+```python
+CLS_TOKEN  = "..."   # 财联社 token
+CLS_UID    = "..."   # 财联社 uid
+CLS_COOKIE = "..."   # 财联社完整 Cookie
+```
+
+**获取方法：**
+
+1. 浏览器登录 https://www.cls.cn/telegraph
+2. 按 F12 打开开发者工具 → Network 标签
+3. 刷新页面，找到 `/api/cache` 开头的请求
+4. 右键 → **Copy as cURL**
+5. 从复制内容中提取：
+   - URL 参数中的 `token=...` 和 `uid=...`
+   - `-b '...'` 后面的完整 Cookie 字符串
+
+> **注意：** Cookie 有效期约 2 个月，过期后重新复制替换即可。东方财富无需任何登录配置。
+
+---
+
+### 第二步：诊断接口
+
+运行前先确认两个数据源都能正常访问：
+
+```bash
+python scraper.py --mode diagnose
+```
+
+正常输出如下：
+
+```
+--- 财联社诊断 ---
+✅ 电报流正常，获取 20 条
+✅ 搜索接口正常，立讯精密历史共 1116 条
+
+--- 东方财富诊断 ---
+✅ 东方财富接口正常，立讯精密新闻第1条：
+   title=立讯精密成交额超100亿元
+```
+
+两个 ✅ 都出现后再进行下一步。
+
+---
+
+### 第三步：抓取数据
+
+```bash
+python scraper.py --mode once
+```
+
+程序会依次对十家公司进行抓取：
+- **财联社**：关键词搜索历史电报（默认最多10页，每页20条）+ 实时电报流补充
+- **东方财富**：关键词搜索新闻（默认10页，每页20条）+ 自动爬取原文全文 + 标题去重
+
+数据存入 `sentiment_news.db`（SQLite），**重复数据自动忽略，多次运行安全**。
+
+预计运行时间：10 家公司约 30～60 分钟（东方财富爬全文较慢）。
+
+---
+
+### 第四步：导出 CSV
+
+```bash
+python scraper.py --mode query --company 立讯精密 --days 365
+```
+
+会在 `exports/` 目录下生成两个文件：
+
+```
+exports/财联社/立讯精密_365天.csv
+exports/东方财富/立讯精密_365天.csv
+```
+
+`--days` 参数控制导出最近多少天的数据，默认 7 天。
+
+---
+
+## 所有运行模式
+
+| 命令 | 说明 |
+|---|---|
+| `python scraper.py --mode once` | 单次抓取所有公司 |
+| `python scraper.py --mode daemon` | 持续监控（每5分钟自动抓取一次） |
+| `python scraper.py --mode diagnose` | 诊断接口是否正常 |
+| `python scraper.py --mode query --company 恒瑞医药 --days 30` | 导出指定公司最近30天数据 |
+
+---
+
+## CSV 字段说明
+
+| 字段 | 说明 | 示例 |
+|---|---|---|
+| `source` | 新闻来源 | `财联社` / `东方财富-证券时报网` |
+| `pub_time` | 发布时间 | `2026-05-28 16:05:34` |
+| `title` | 标题 | `市场监管总局对立讯精密处以90万元罚款` |
+| `content` | 正文全文 | `5月27日，市场监管总局……` |
+| `url` | 原文链接 | `https://www.cls.cn/detail/2384192` |
+
+> **财联社**：电报格式为`【标题】正文`，title 字段自动从【】中提取；部分早间汇总新闻会包含多家公司内容，属于正常现象。
+>
+> **东方财富**：已按标题去重，相同标题只保留一条；content 为原文全文而非摘要片段。
+
+---
+
+## 监控的十家公司
+
+| 公司 | 股票代码 | 交易所 |
+|---|---|---|
+| 立讯精密 | 002475 | 深交所 |
+| 佰维存储 | 688525 | 科创板 |
+| 中芯国际 | 688981 | 科创板 |
+| 中信证券 | 600030 | 上交所 |
+| 工业富联 | 601138 | 上交所 |
+| 郑州煤电 | 600121 | 上交所 |
+| 兆易创新 | 603986 | 上交所 |
+| 京能电力 | 600791 | 上交所 |
+| 蔚蓝锂芯 | 002245 | 深交所 |
+| 恒瑞医药 | 600276 | 上交所 |
+
+---
+
+## 新增公司
+
+在 `scraper.py` 顶部的 `COMPANIES` 列表中添加一行：
+
+```python
+{"name": "比亚迪", "stock_code": "sz002594", "keywords": ["比亚迪", "002594"]},
+```
+
+字段说明：
+- `name`：公司名称（用于数据库存储和文件命名）
+- `stock_code`：股票代码，深交所前缀 `sz`，上交所/科创板前缀 `sh`
+- `keywords`：搜索关键词列表，第一个用于东方财富搜索，前两个用于财联社搜索
+
+---
+
+## 常见问题
+
+**Q：财联社显示 ❌ 失败**
+
+Cookie 过期，重新从浏览器复制粘贴 `CLS_TOKEN`、`CLS_UID`、`CLS_COOKIE` 三个变量。
+
+**Q：东方财富 content 字段内容很少**
+
+全文爬取可能被反爬拦截，可在 `scraper.py` 的 `fetch_fulltext` 方法中将 `time.sleep(1)` 改为 `time.sleep(2)` 后重试。
+
+**Q：某公司命中条数为 0**
+
+该公司近期确实没有相关新闻，或关键词设置过窄。可在 `keywords` 列表中增加别称，如 `["恒瑞医药", "恒瑞", "600276"]`。
+
+**Q：想只测试东方财富的效果**
+
+使用独立脚本：
+
+```bash
+python eastmoney_only.py --company 恒瑞医药 --pages 5
+```
+
+结果直接保存到 `exports/东方财富/恒瑞医药_东方财富.csv`。
+
+---
+
+## 数据库直接查询
+
+数据存储在 `sentiment_news.db`，可用 [DB Browser for SQLite](https://sqlitebrowser.org/)（免费工具）图形化查看，或用命令行查询各公司数据量：
+
+```bash
+python -c "
+import sqlite3
+conn = sqlite3.connect('sentiment_news.db')
+for row in conn.execute('SELECT company, source, COUNT(*) FROM news GROUP BY company, source ORDER BY company'):
+    print(f'{row[0]:10s} | {row[1]:20s} | {row[2]} 条')
+"
+```

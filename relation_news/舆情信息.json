@@ -1,0 +1,76 @@
+{
+  "event_id": "",
+  "company_name": "",
+  "ts_code": "",
+  "source": "",
+  "pub_time": "",
+  "title": "",
+  "content": "",
+  "url": "",
+  "event_type": "",
+  "event_subtype": "",
+  "event_time": "",
+  "company_role": "",
+  "related_companies": [],
+  "summary": "",
+  "keywords": [],
+  "sentiment": "",
+  "importance": 0
+}
+字段说明
+
+event_id：事件唯一ID
+company_name：当前锚点公司，比如“中信证券”
+ts_code：公司代码，后续用于连图
+source：原始来源，如“东方财富-新华财经”
+pub_time：新闻发布时间
+title：标题
+content：正文
+url：原文链接
+event_type：一级事件类型，如 资本运作 / 研报观点 / 保荐承销 / 舆情 / 公告
+event_subtype：二级类型，如 定增 / 行业点评 / IPO保荐
+event_time：事件发生时间；没有就先用 pub_time 的日期部分
+company_role：该公司在事件中的角色，如 主体 / 发布方 / 保荐人 / 被提及方
+related_companies：事件里涉及的其他公司，后续做公司之间连边
+summary：1句话摘要
+keywords：关键词
+sentiment：情感倾向，建议 positive / neutral / negative
+importance：事件重要性，建议 1-5
+related_companies 建议格式
+
+[
+  {
+    "company_name": "特斯拉",
+    "role": "关联方"
+  },
+  {
+    "company_name": "小商品城",
+    "role": "保荐服务对象"
+  }
+]
+例子：
+
+{
+  "event_id": "600030_20260530_001",
+  "company_name": "中信证券股份有限公司",
+  "ts_code": "600030.SH",
+  "source": "东方财富-经济参考报",
+  "pub_time": "2026-05-30 03:30:04",
+  "title": "中信证券160亿元定增落地 券业资本补充提速",
+  "content": "......",
+  "url": "http://finance.eastmoney.com/a/202605303755087495.html",
+  "event_type": "资本运作",
+  "event_subtype": "定向增发",
+  "event_time": "2026-05-28",
+  "company_role": "主体",
+  "related_companies": [
+    {
+      "company_name": "中信金控",
+      "role": "认购方"
+    }
+  ],
+  "summary": "中信证券拟定增160亿元H股，用于国际化业务发展。",
+  "keywords": ["定增", "H股", "国际化", "资本补充"],
+  "sentiment": "positive",
+  "importance": 5
+}
