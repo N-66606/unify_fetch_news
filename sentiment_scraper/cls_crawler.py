@@ -145,7 +145,7 @@ def scrape_search(sess, keyword, max_pages=10):
     return results
 
 
-def scrape_stream(sess, keywords, stream_pages=5):
+def scrape_stream(sess, keywords, stream_pages=5, date_start=None):
     results = []
     items = fetch_stream_page(sess)
     log.info(f"[财联社流] 首页 {len(items)} 条")
@@ -179,6 +179,20 @@ def scrape_stream(sess, keywords, stream_pages=5):
         log.info(f"[财联社流] 第{p+1}页 {len(items)} 条")
         if not items:
             break
+        
+        # 检查是否需要继续爬取（根据日期）
+        if date_start and items:
+            page_earliest_ts = items[-1].get("ctime", 0)
+            page_earliest_date = datetime.fromtimestamp(page_earliest_ts).strftime("%Y-%m-%d") if page_earliest_ts else ""
+            if page_earliest_date and page_earliest_date < date_start:
+                log.info(f"[财联社流] 当前页最早日期 {page_earliest_date} 早于起始日期 {date_start}，停止爬取")
+                # 仍然添加当前页的数据，后续会过滤
+                for it in items:
+                    rec = _to_record(it)
+                    if rec:
+                        results.append(rec)
+                break
+        
         for it in items:
             rec = _to_record(it)
             if rec:
@@ -196,7 +210,7 @@ def scrape(company, date_start=None, date_end=None, max_pages=10, stream_pages=5
     search_records = scrape_search(sess, company, max_pages=max_pages)
 
     # 电报流
-    stream_records = scrape_stream(sess, keywords, stream_pages=stream_pages)
+    stream_records = scrape_stream(sess, keywords, stream_pages=stream_pages, date_start=date_start)
 
     # 合并去重（按 _id）
     seen, all_records = set(), []

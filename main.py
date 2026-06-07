@@ -23,7 +23,9 @@ import os, sys, argparse, logging, subprocess
 from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import DEFAULT_DAYS_BACK
+# from config import DEFAULT_DAYS_BACK
+from config import DEFAULT_DAYS_BACK, DEFAULT_COMPANIES
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("main")
@@ -67,6 +69,8 @@ def run_crawler(source, companies, date_start, date_end):
     args = []
     if companies:
         args += ["--company"] + companies
+    else:
+        args += ["--company"] + DEFAULT_COMPANIES
     if date_start:
         args += ["--date-start", date_start]
     if date_end:
