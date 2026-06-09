@@ -64,7 +64,7 @@ REQUEST_INTERVAL  = (1.0, 2.0)
 INTER_DIR  = os.path.join("intermediate")
 TEXT_DIR   = os.path.join(INTER_DIR, "text")
 PDF_DIR    = os.path.join(INTER_DIR, "pdf")
-OUTPUT_CSV = os.path.join(INTER_DIR, "csv", "result_cninfo.csv")
+OUTPUT_CSV_DIR = os.path.join(INTER_DIR, "csv", "cninfo")
 
 # CSV 输出字段（与 cnstock/jrj 对齐，额外保留公告特有字段）
 CSV_FIELDS = [
@@ -304,21 +304,27 @@ def main():
     log.info(f"爬取公司：{companies}")
     log.info(f"时间段：{date_start} ~ {date_end}")
 
-    session  = build_session()
-    all_recs = []
+    session = build_session()
+    total = 0
     for name in companies:
         try:
-            all_recs.extend(crawl_company(session, name, date_start, date_end))
+            recs = crawl_company(session, name, date_start, date_end)
         except Exception as e:
             log.error(f"公司 {name} 处理失败：{e}")
+            continue
+        if not recs:
+            log.info(f"{name}：无命中记录，跳过写入")
+            continue
+        os.makedirs(OUTPUT_CSV_DIR, exist_ok=True)
+        out_path = os.path.join(OUTPUT_CSV_DIR, f"result_cninfo_{name}.csv")
+        with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
+            w.writeheader()
+            w.writerows(recs)
+        total += len(recs)
+        log.info(f"{name}：{len(recs)} 条 -> {out_path}")
 
-    os.makedirs(os.path.dirname(OUTPUT_CSV), exist_ok=True)
-    with open(OUTPUT_CSV, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(all_recs)
-
-    log.info(f"完成：{len(all_recs)} 条 -> {OUTPUT_CSV}")
+    log.info(f"完成：共 {total} 条，按公司写入 {OUTPUT_CSV_DIR}")
 
 
 if __name__ == "__main__":

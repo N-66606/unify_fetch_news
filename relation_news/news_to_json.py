@@ -42,8 +42,8 @@ REQUEST_INTERVAL = 0.8
 
 SOURCE_CONFIG = {
     "cninfo": {
-        "csv_path":      os.path.join("intermediate", "csv", "result_cninfo.csv"),
-        "csv_format":    "relation",
+        "csv_glob":      os.path.join(PROJECT_ROOT, "intermediate", "csv", "cninfo", "result_cninfo_*.csv"),
+        "csv_format":    "cninfo_per_company",
         "source_label":  "巨潮资讯网",
         "output_dir":    os.path.join("output", "cninfo_json"),
         "cache_prefix":  "cninfo",
@@ -330,6 +330,8 @@ def build_event(rec, llm, seq_map, source_label, blacklist):
 # ============================ CSV 读取 ============================
 
 def _read_csv(path):
+    # 增加 CSV 字段大小限制，避免大字段报错
+    csv.field_size_limit(2 * 1024 * 1024)  # 2MB
     for enc in ["utf-8-sig", "gbk", "gb2312", "utf-8"]:
         try:
             with open(path, encoding=enc) as f:
@@ -343,6 +345,11 @@ def _read_csv(path):
 
 def _company_from_filename(path):
     return os.path.splitext(os.path.basename(path))[0].split("_")[0]
+
+
+def _company_from_cninfo_filename(path):
+    basename = os.path.splitext(os.path.basename(path))[0]
+    return basename.replace("result_cninfo_", "", 1)
 
 
 def load_data(cfg, company_filter=None, date_start=None, date_end=None):
@@ -360,6 +367,24 @@ def load_data(cfg, company_filter=None, date_start=None, date_end=None):
             if date_start and pub and pub < date_start: continue
             if date_end   and pub and pub > date_end:   continue
             by_company.setdefault(company, []).append(r)
+    elif cfg["csv_format"] == "cninfo_per_company":
+        files = sorted(glob.glob(cfg["csv_glob"]))
+        if not files:
+            log.warning(f"未找到文件：{cfg['csv_glob']}"); return {}
+        for fpath in files:
+            company = _company_from_cninfo_filename(fpath)
+            if company_filter and company not in company_filter: continue
+            rows = _read_csv(fpath)
+            if not rows:
+                log.warning(f"{fpath} 无数据"); continue
+            log.info(f"读取 {fpath}，共 {len(rows)} 行")
+            for r in rows:
+                r["_company"] = company
+                pub = normalize_date(r.get("发布日期", ""))
+                if date_start and pub and pub < date_start: continue
+                if date_end   and pub and pub > date_end:   continue
+                by_company.setdefault(company, []).append(r)
+            log.info(f"  {os.path.basename(fpath)} → {company}，{len(rows)} 行")
     else:
         files = sorted(glob.glob(cfg["csv_glob"]))
         if not files:
